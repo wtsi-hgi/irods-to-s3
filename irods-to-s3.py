@@ -84,7 +84,7 @@ if __name__ == "__main__":
                 print(_usage)
                 sys.exit(1)
 
-            print("File exists on S3, deleting: {s3_url}")
+            print(f"File exists on S3, deleting: {s3_url}")
             S3.delete_object(Bucket=s3_bucket, Key=s3_obj)
 
         except ClientError:
