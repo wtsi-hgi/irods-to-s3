@@ -62,12 +62,17 @@ if __name__ == "__main__":
         irods_size = data_object.size
 
         def _progress(so_far):
-            print(f"Copied {so_far} of {irods_size} bytes; {so_far/irods_size:.1%} complete")
+            # FIXME This does not work as documented
+            # print(f"Copied {so_far} of {irods_size} bytes; {so_far/irods_size:.1%} complete")
+            pass
 
         if s3_obj in ("", "/"):
             s3_obj = data_object.path
 
-        s3_url = f"s3://{s3_bucket}{s3_obj}"
+        if s3_obj.startswith("/"):
+            s3_obj = s3_obj[1:]
+
+        s3_url = f"s3://{s3_bucket}/{s3_obj}"
 
         S3 = boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL"))
 
@@ -93,7 +98,7 @@ if __name__ == "__main__":
 
         print("Copy complete")
 
-        # S3 uses the ETag on an object for its checksum, which is an
-        # MD5 sum when not a multipart upload. For a multipart upload, a
-        # different algorithm is used. We therefore can't easily compare
-        # the iRODS checksum with the S3 one :(
+        # FIXME/TODO S3 uses the ETag on an object for its checksum,
+        # which is an MD5 sum when not a multipart upload. For a
+        # multipart upload, a different algorithm is used. We therefore
+        # can't easily compare the iRODS checksum with the S3 one :(
