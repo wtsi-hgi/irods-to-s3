@@ -86,10 +86,12 @@ if __name__ == "__main__":
             # Object doesn't exist on S3, so carry on
             pass
 
-        with data_object.open("rb") as irods_stream:
-            S3.upload_fileobj(irods_stream, s3_bucket, s3_obj, callback=_progress)
+        print(f"Copying {data_object.path} from iRODS to {s3_url}...")
 
-        print("Upload complete")
+        with data_object.open("r+") as irods_stream:
+            S3.upload_fileobj(irods_stream, s3_bucket, s3_obj, Callback=_progress)
+
+        print("Copy complete")
 
         # S3 uses the ETag on an object for its checksum, which is an
         # MD5 sum when not a multipart upload. For a multipart upload, a
