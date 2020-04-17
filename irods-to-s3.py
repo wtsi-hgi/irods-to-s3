@@ -96,6 +96,11 @@ if __name__ == "__main__":
         with data_object.open("r+") as irods_stream:
             S3.upload_fileobj(irods_stream, s3_bucket, s3_obj, Callback=_progress)
 
+        s3_file = S3.head_object(Bucket=s3_bucket, Key=s3_obj)
+        if s3_file["ContentLength"] != irods_size:
+            print("Copy failed, sizes differ")
+            sys.exit(1)
+
         print("Copy complete")
 
         # FIXME/TODO S3 uses the ETag on an object for its checksum,
