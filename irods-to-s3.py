@@ -7,7 +7,7 @@ import os
 import ssl
 import sys
 from collections import deque
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 import boto3
 from botocore.errorfactory import ClientError
@@ -42,7 +42,7 @@ if __name__ == "__main__":
             print(_usage)
             sys.exit(1)
 
-    parsed_url = urlparse(s3_url)
+    parsed_url = urlparse(s3_url, allow_fragments=False)
     if parsed_url.scheme != "s3" or parsed_url.netloc == "":
         print("Invalid S3 URL")
         print(_usage)
@@ -69,8 +69,10 @@ if __name__ == "__main__":
         if s3_obj in ("", "/"):
             s3_obj = data_object.path
 
-        if s3_obj.startswith("/"):
+        while s3_obj.startswith("/"):
             s3_obj = s3_obj[1:]
+
+        s3_obj = quote(s3_obj)
 
         s3_url = f"s3://{s3_bucket}/{s3_obj}"
 
