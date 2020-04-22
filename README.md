@@ -43,7 +43,7 @@ keys:
 
 Restricted characters are those that ought to be avoided in S3 keys:
 
-* Backslash ("\")
+* Backslash ("\\")
 * Left curly brace ("{")
 * Non-printable ASCII characters (0x80-0xFF)
 * Caret ("^")

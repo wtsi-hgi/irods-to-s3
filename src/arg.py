@@ -19,6 +19,9 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from argparse import ArgumentParser
 
+from .s3 import S3Object
+
+
 arg_parser = ArgumentParser(description="Copy files from iRODS to S3")
 
 arg_parser.add_argument("-f", "--force", action="store_true",
@@ -45,7 +48,7 @@ s3cmd_args.add_argument("--s3cfg",
 
 arg_parser.add_argument("source", metavar="SOURCE", type=str, nargs="+",
     help="iRODS source data objects or collections")
-arg_parser.add_argument("target", metavar="s3://BUCKET[/KEY]", type=str,
+arg_parser.add_argument("target", metavar="s3://BUCKET[/KEY]", type=S3Object,
     help="S3 destination")
 
 parse = arg_parser.parse_args
