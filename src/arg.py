@@ -18,6 +18,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 """
 
 from argparse import ArgumentParser
+from pathlib import Path
 
 from .s3 import S3Object
 
@@ -46,7 +47,7 @@ s3cmd_args = arg_parser.add_argument_group("s3cmd interaction")
 s3cmd_args.add_argument("--s3cfg",
     help="use s3cmd configuration, rather than from environment")
 
-arg_parser.add_argument("source", metavar="SOURCE", type=str, nargs="+",
+arg_parser.add_argument("source", metavar="SOURCE", type=Path, nargs="+",
     help="iRODS source data objects or collections")
 arg_parser.add_argument("target", metavar="s3://BUCKET[/KEY]", type=S3Object,
     help="S3 destination")
