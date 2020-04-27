@@ -17,10 +17,13 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+from __future__ import annotations
+
 import re
 import typing as T
 from dataclasses import dataclass
 from ipaddress import ip_address
+from pathlib import Path
 
 
 _S3_URL = re.compile(r"""
@@ -77,3 +80,20 @@ class S3Object:
 
         self.has_special    = bool(_S3_KEY_SPECIAL.search(key or ""))
         self.has_restricted = bool(_S3_KEY_AVOID.search(key or ""))
+
+    def __truediv__(self, path:T.Union[Path, str]) -> S3Object:
+        # Syntactic sugar (similar to pathlib) for appending a path to
+        # the S3 object (e.g., you can do: s3_obj / "path/to/somewhere")
+        path = Path(path)
+        if path.is_absolute():
+            root = Path("/")
+            path = path.relative_to(root)
+
+        key = Path(self.key or "") / Path(path)
+        return S3Object(f"s3://{self.bucket}/{key}")
+
+    @property
+    def url(self) -> str:
+        # Construct and return the S3 URL
+        key = self.key or ""
+        return f"s3://{self.bucket}/{key}"
