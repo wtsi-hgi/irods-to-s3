@@ -56,7 +56,7 @@ def session() -> iRODSSession:
     Convenience wrapper to create an iRODS session with the usual
     environment configuration and a secure connection
     """
-    return iRODSSession(irods_env_file=_irods_env, *_ssl)
+    return iRODSSession(irods_env_file=_irods_env, **_ssl)
 
 
 def get_irods_object(session:iRODSSession, path:Path) -> _iRODSObject:
