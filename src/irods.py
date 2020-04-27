@@ -78,7 +78,7 @@ def get_irods_object(session:iRODSSession, path:Path) -> _iRODSObject:
     raise NoSuchObject(f"iRODS object {path} doesn't exist")
 
 
-def expand(*objs:_iRODSObject, recursive:bool = True) -> T.Iterator[iRODSDataObject]:
+def expand(*objs:_iRODSObject, recursive:bool = True) -> T.Iterator[T.Union[iRODSDataObject, CannotDescend]]:
     """
     Generator of iRODS data objects, expanded recursively by default,
     from a list of sources
@@ -90,7 +90,10 @@ def expand(*objs:_iRODSObject, recursive:bool = True) -> T.Iterator[iRODSDataObj
     for obj in objs:
         if _is_collection(obj):
             if not recursive:
-                raise CannotDescend(f"iRODS object at {obj.path} is a collection")
+                # Raising in a generator will kill the generator, so we
+                # yield the exception for downstream handling
+                yield CannotDescend(f"iRODS object at {obj.path} is a collection")
+                continue
 
             yield from obj.data_objects
             yield from expand(*obj.subcollections)
