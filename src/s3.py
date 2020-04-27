@@ -33,7 +33,7 @@ _S3_URL = re.compile(r"""
     (?: / (?P<key> .*))?$
     """, re.VERBOSE | re.ASCII)
 
-_S3_KEY_SPECIAL = re.compile(r"[&$@=;:+ ,?\x00-\x1f]")
+_S3_KEY_SPECIAL = re.compile(r"[&$@=;:+ ,?\x00-\x1f\x7f]")
 
 _S3_KEY_AVOID = re.compile(r"[\^\"\\{}\[\]<>#~%`|\x80-\xff]")
 

@@ -20,6 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 import os
 import ssl
 import typing as T
+from pathlib import Path
 
 from irods.data_object import iRODSDataObject
 from irods.collection import iRODSCollection

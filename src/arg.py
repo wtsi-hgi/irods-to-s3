@@ -33,6 +33,8 @@ arg_parser.add_argument("--make-bucket", action="store_true",
     help="make S3 bucket if it does not exist")
 arg_parser.add_argument("--ignore-avus", action="store_true",
     help="don't replicate the iRODS AVUs on S3")
+arg_parser.add_argument("--dry-run", action="store_true",
+    help="don't transfer any data, only log what will happen")
 arg_parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose output")
 

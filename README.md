@@ -4,8 +4,9 @@ Copy files from iRODS to S3.
 
 ## Usage
 
-    irods-to-s3 [-h] [-f] [-R] [--make-bucket] [--ignore-avus] [-v]
-                [--forbid-special | --allow-restricted] [--s3cfg S3CFG]
+    irods-to-s3 [-h] [-f] [-R] [--make-bucket] [--ignore-avus] [--dry-run]
+                [-v] [--forbid-special | --allow-restricted]
+                [--s3cfg S3CFG]
                 SOURCE [SOURCE ...] s3://BUCKET[/KEY]
 
 ### Positional Arguments
@@ -19,6 +20,7 @@ Copy files from iRODS to S3.
     -R, --recursive     Copy iRODS collections recursively
     --make-bucket       Make S3 bucket if it does not exist
     --ignore-avus       Don't replicate the iRODS AVUs on S3
+    --dry-run           Don't transfer any data, only log what will happen
     -v, --verbose       Verbose output
 
 ### S3 Key Character Control
