@@ -164,3 +164,6 @@ class S3Client:
 
     def make_bucket(self, bucket:str) -> None:
         self._client.create_bucket(Bucket=bucket)
+
+    def delete_object(self, obj:S3Object) -> None:
+        self._client.delete_object(Bucket=obj.bucket, Key=obj.key)
