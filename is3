@@ -1,111 +1,168 @@
 #!/usr/bin/env python
 
-# Quick-and-Dirty iRODS-to-S3 copy
-# Christopher Harrison <ch12@sanger.ac.uk>
+"""
+Copyright (c) 2020 Genome Research Limited
 
-import os
-import ssl
+Author: Christopher Harrison <ch12@sanger.ac.uk>
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program. If not, see https://www.gnu.org/licenses/
+"""
+
 import sys
-from collections import deque
-from urllib.parse import urlparse, quote
+from functools import partial
+from datetime import datetime
 
-import boto3
-from botocore.errorfactory import ClientError
-from irods.session import iRODSSession
+from src import arg, irods, s3, utils
+from src.log import Level, Logger
 
 
-_usage = f"Usage: {sys.argv[0]} [--force] IRODS_DATA_OBJECT s3://BUCKET[/S3_OBJECT]"
-_ssl = {"ssl_context": ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=None, capath=None, cadata=None)}
+class BucketNotFound(Exception):
+    """ Raised when an S3 bucket doesn't exist """
+
+class ContainsRestricted(Exception):
+    """ Raised when an iRODS data object contains S3 restricted characters """
+
+class ContainsSpecial(Exception):
+    """ Raised when an iRODS data object contains S3 special characters """
+
+class ObjectAlreadyExists(Exception):
+    """ Raised when an S3 object already exists """
+
+
+def _handle_exception(log:Logger, exc:Exception) -> None:
+    # Log the exception, show the help text and exit non-zero
+    log.error(str(exc))
+    arg.help()
+    sys.exit(1)
 
 
 if __name__ == "__main__":
-    argv = deque(sys.argv[1:])
-
-    force = False
-    if argv and argv[0] == "--force":
-        force = True
-        argv.popleft()
+    log = Logger(Level.Warning)
+    _handle = partial(_handle_exception, log)
 
     try:
-        irods_obj, s3_url = argv
-    except ValueError:
-        print("Invalid arguments!")
-        print(_usage)
-        sys.exit(1)
+        args = arg.parse()
+    except s3.InvalidS3Bucket as exc:
+        _handle(exc)
+    except s3.InvalidS3URL as exc:
+        _handle(exc)
 
-    irods_env = os.getenv("IRODS_ENVIRONMENT_FILE",
-                          os.path.expanduser("~/.irods/irods_environment.json"))
+    if args.verbose:
+        log.level = Level.Info
 
-    for env_var in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "S3_ENDPOINT_URL"]:
-        if not env_var in os.environ:
-            print(f"S3 environment variable not set: {env_var}")
-            print(_usage)
-            sys.exit(1)
+    try:
+        s3client = s3.S3Client(config=args.s3cfg)
+    except FileNotFoundError as exc:
+        _handle(exc)
+    except s3.InvalidS3Config as exc:
+        _handle(exc)
 
-    parsed_url = urlparse(s3_url, allow_fragments=False)
-    if parsed_url.scheme != "s3" or parsed_url.netloc == "":
-        print("Invalid S3 URL")
-        print(_usage)
-        sys.exit(1)
+    bucket = args.target.bucket
+    if not s3client.bucket_exists(bucket):
+        if not args.make_bucket:
+            _handle(BucketNotFound(f"No such bucket s3://{bucket}"))
 
-    s3_bucket = parsed_url.netloc
-    s3_obj = parsed_url.path
+        log.info(f"Creating bucket s3://{bucket}")
+        s3client.make_bucket(bucket)
 
-    with iRODSSession(irods_env_file=irods_env, **_ssl) as session:
-        if not session.data_objects.exists(irods_obj):
-            print(f"Data object not found on iRODS: {irods_obj}")
-            print(_usage)
-            sys.exit(1)
-
-        data_object = session.data_objects.get(irods_obj)
-        irods_checksum = data_object.checksum
-        irods_size = data_object.size
-
-        def _progress(so_far):
-            # FIXME This does not work as documented
-            # print(f"Copied {so_far} of {irods_size} bytes; {so_far/irods_size:.1%} complete")
-            pass
-
-        if s3_obj in ("", "/"):
-            s3_obj = data_object.path
-
-        while s3_obj.startswith("/"):
-            s3_obj = s3_obj[1:]
-
-        s3_obj = quote(s3_obj)
-
-        s3_url = f"s3://{s3_bucket}/{s3_obj}"
-
-        S3 = boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL"))
+    with irods.session() as isess:
+        path_to_irods = partial(irods.get_irods_object, isess)
 
         try:
-            _ = S3.head_object(Bucket=s3_bucket, Key=s3_obj)
+            data_objects = irods.expand(*map(path_to_irods, args.source), args.recursive)
+        except irods.NotAbsolute as exc:
+            _handle(exc)
+        except irods.NoSuchObject as exc:
+            _handle(exc)
 
-            if not force:
-                print(f"File already exists on S3: {s3_url}")
-                print(_usage)
-                sys.exit(1)
+        try:
+            for data_object in data_objects:
+                s3_target = args.target / data_object.path
+                log.info(f"Transferring {data_object.path} to {s3_target.url}")
 
-            print(f"File exists on S3, deleting: {s3_url}")
-            S3.delete_object(Bucket=s3_bucket, Key=s3_obj)
+                if s3_target.has_restricted:
+                    message = f"iRODS data object {data_object.path} contains restricted S3 characters"
 
-        except ClientError:
-            # Object doesn't exist on S3, so carry on
-            pass
+                    if not args.allow_restricted:
+                        raise ContainsRestricted(message)
 
-        print(f"Copying {data_object.path} from iRODS to {s3_url}...")
+                    log.warning(message)
 
-        with data_object.open("r+") as irods_stream:
-            S3.upload_fileobj(irods_stream, s3_bucket, s3_obj, Callback=_progress)
+                if s3_target.has_special and args.forbid_special:
+                    message = f"iRODS data object {data_object.path} contains special S3 characters"
 
-        s3_file = S3.head_object(Bucket=s3_bucket, Key=s3_obj)
-        if s3_file["ContentLength"] != irods_size:
-            print("Copy failed, sizes differ")
-            sys.exit(1)
+                    if args.forbid_special:
+                        raise ContainsSpecial(message)
 
-        print("Copy complete")
+                    log.warning(message)
 
-        # FIXME/TODO S3 uses the ETag on an object for its checksum,
-        # which is an MD5 sum when not a multipart upload. For a
-        # multipart upload, a different algorithm is used. We therefore
-        # can't easily compare the iRODS checksum with the S3 one :(
+                if not args.dry_run:
+                    if s3client.object_exists(s3_target):
+                        message = f"S3 object {s3_target.url} already exists"
+
+                        if not args.force:
+                            raise ObjectAlreadyExists(message)
+
+                        log.info(f"{message}; replacing")
+                        s3client.delete_object(s3_target)
+
+                    start_ts = datetime.utcnow()
+
+                    # TODO
+                    # Copy (inc metadata, if requested)
+                    # Verify (by size and checksum)
+
+                    tx_time = datetime.utcnow() - start_ts
+                    tx_rate = data_object.size / tx_time.total_seconds()
+
+                    log.info("Complete; "
+                             f"transferred {utils.human_size(data_object.size)}B "
+                             f"at {utils.human_size(tx_rate)}B/s")
+
+
+        # NOTE The generator is evaluated lazily, so exceptions will
+        # only be raised when a dodgy data object is hit, rather than
+        # ahead of time (i.e., some transfers could go through before)
+
+        except irods.CannotDescend as exc:
+            _handle(exc)
+
+        except ContainsRestricted as exc:
+            _handle(exc)
+
+        except ContainsSpecial as exc:
+            _handle(exc)
+
+        except ObjectAlreadyExists as exc:
+            _handle(exc)
+
+
+##    with iRODSSession(irods_env_file=irods_env, **_ssl) as session:
+##
+##        data_object = session.data_objects.get(irods_obj)
+##        irods_checksum = data_object.checksum
+##        irods_size = data_object.size
+##
+##        def _progress(so_far):
+##            # FIXME This does not work as documented
+##            # print(f"Copied {so_far} of {irods_size} bytes; {so_far/irods_size:.1%} complete")
+##            pass
+##
+##        with data_object.open("r+") as irods_stream:
+##            S3.upload_fileobj(irods_stream, s3_bucket, s3_obj, Callback=_progress)
+##
+##        s3_file = S3.head_object(Bucket=s3_bucket, Key=s3_obj)
+##        if s3_file["ContentLength"] != irods_size:
+##            print("Copy failed, sizes differ")
+##            sys.exit(1)
