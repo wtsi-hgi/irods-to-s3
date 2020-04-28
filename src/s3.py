@@ -19,11 +19,16 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from __future__ import annotations
 
+import os
 import re
 import typing as T
+from configparser import ConfigParser
 from dataclasses import dataclass
 from ipaddress import ip_address
 from pathlib import Path
+
+import boto3
+from botocore.client import S3 as S3Client
 
 
 _S3_URL = re.compile(r"""
@@ -53,6 +58,9 @@ class InvalidS3URL(Exception):
 
 class InvalidS3Bucket(InvalidS3URL):
     """ Raised when an S3 bucket name is invalid """
+
+class InvalidS3Config(Exception):
+    """ Raised when no/invalid S3 configuration is found """
 
 
 @dataclass(init=False)
@@ -97,3 +105,39 @@ class S3Object:
         # Construct and return the S3 URL
         key = self.key or ""
         return f"s3://{self.bucket}/{key}"
+
+
+def client(config:T.Optional[Path] = None) -> S3Client:
+    if config is None:
+        # Get configuration from environment
+        for env_var in "AWS_ACCESS_KEY_ID",\
+                       "AWS_SECRET_ACCESS_KEY",\
+                       "S3_ENDPOINT_URL":
+
+            if not env_var in os.environ:
+                raise InvalidS3Config(f"S3 environment variable not set: {env_var}")
+
+        return boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL"))
+
+    # Otherwise, attempt to parse an s3cmd configuration file
+    config = config.expanduser().resolve()
+    if not config.exists():
+        raise FileNotFoundError(f"No s3cmd configuration found in {config}")
+
+    c = ConfigParser()
+    c.read(config)
+
+    if not c.has_section("default"):
+        raise InvalidS3Config(f"Invalid s3cmd configuration; no \"default\" profile")
+
+    for key in "host_base", "access_key", "secret_key":
+        if not c.has_option("default", key):
+            raise InvalidS3Config(f"Invalid s3cmd configuration; no \"{key}\" option")
+
+    https = c.has_option("default", "use_https") and c.getboolean("default", "use_https")
+    endpoint = ("https" if https else "http") + "://" + c.get("default", "host_base")
+
+    return boto3.client("s3", use_ssl=https,
+                              endpoint_url=endpoint,
+                              aws_access_key_id=c.get("default", "access_key"),
+                              aws_secret_access_key=c.get("default", "secret_key"))

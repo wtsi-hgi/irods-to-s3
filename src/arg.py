@@ -46,7 +46,7 @@ char_args_mutex.add_argument("--allow-restricted", action="store_true",
     help="allow S3 restricted characters in the destination keys")
 
 s3cmd_args = arg_parser.add_argument_group("s3cmd interaction")
-s3cmd_args.add_argument("--s3cfg",
+s3cmd_args.add_argument("--s3cfg", type=Path,
     help="use s3cmd configuration, rather than from environment")
 
 arg_parser.add_argument("source", metavar="SOURCE", type=Path, nargs="+",
