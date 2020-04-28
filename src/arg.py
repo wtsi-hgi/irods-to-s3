@@ -54,4 +54,6 @@ arg_parser.add_argument("source", metavar="SOURCE", type=Path, nargs="+",
 arg_parser.add_argument("target", metavar="s3://BUCKET[/KEY]", type=S3Object,
     help="S3 destination")
 
+
 parse = arg_parser.parse_args
+help  = arg_parser.print_help
