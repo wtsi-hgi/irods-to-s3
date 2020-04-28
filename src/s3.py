@@ -28,7 +28,7 @@ from ipaddress import ip_address
 from pathlib import Path
 
 import boto3
-from botocore.client import S3 as S3Client
+from botocore.exceptions import ClientError
 
 
 _S3_URL = re.compile(r"""
@@ -107,37 +107,60 @@ class S3Object:
         return f"s3://{self.bucket}/{key}"
 
 
-def client(config:T.Optional[Path] = None) -> S3Client:
-    if config is None:
-        # Get configuration from environment
-        for env_var in "AWS_ACCESS_KEY_ID",\
-                       "AWS_SECRET_ACCESS_KEY",\
-                       "S3_ENDPOINT_URL":
+class S3Client:
+    _client:object  # FIXME botocore.client.S3 is not a thing??
 
-            if not env_var in os.environ:
-                raise InvalidS3Config(f"S3 environment variable not set: {env_var}")
+    def __init__(self, config:T.Optional[Path] = None) -> None:
+        if config is None:
+            # Get configuration from environment
+            for env_var in "AWS_ACCESS_KEY_ID", \
+                           "AWS_SECRET_ACCESS_KEY", \
+                           "S3_ENDPOINT_URL":
 
-        return boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL"))
+                if not env_var in os.environ:
+                    raise InvalidS3Config(f"S3 environment variable not set: {env_var}")
 
-    # Otherwise, attempt to parse an s3cmd configuration file
-    config = config.expanduser().resolve()
-    if not config.exists():
-        raise FileNotFoundError(f"No s3cmd configuration found in {config}")
+            self._client = boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL"))
 
-    c = ConfigParser()
-    c.read(config)
+        else:
+            # Otherwise, attempt to parse an s3cmd configuration file
+            config = config.expanduser().resolve()
+            if not config.exists():
+                raise FileNotFoundError(f"No s3cmd configuration found in {config}")
 
-    if not c.has_section("default"):
-        raise InvalidS3Config(f"Invalid s3cmd configuration; no \"default\" profile")
+            c = ConfigParser()
+            c.read(config)
 
-    for key in "host_base", "access_key", "secret_key":
-        if not c.has_option("default", key):
-            raise InvalidS3Config(f"Invalid s3cmd configuration; no \"{key}\" option")
+            if not c.has_section("default"):
+                raise InvalidS3Config(f"Invalid s3cmd configuration; no \"default\" profile")
 
-    https = c.has_option("default", "use_https") and c.getboolean("default", "use_https")
-    endpoint = ("https" if https else "http") + "://" + c.get("default", "host_base")
+            for key in "host_base", "access_key", "secret_key":
+                if not c.has_option("default", key):
+                    raise InvalidS3Config(f"Invalid s3cmd configuration; no \"{key}\" option")
 
-    return boto3.client("s3", use_ssl=https,
-                              endpoint_url=endpoint,
-                              aws_access_key_id=c.get("default", "access_key"),
-                              aws_secret_access_key=c.get("default", "secret_key"))
+            https = c.has_option("default", "use_https") and c.getboolean("default", "use_https")
+            endpoint = ("https" if https else "http") + "://" + c.get("default", "host_base")
+
+            self._client = boto3.client("s3", use_ssl=https,
+                                              endpoint_url=endpoint,
+                                              aws_access_key_id=c.get("default", "access_key"),
+                                              aws_secret_access_key=c.get("default", "secret_key"))
+
+    def bucket_exists(self, bucket:str) -> bool:
+        try:
+            _ = self._client.head_bucket(Bucket=bucket)
+            return True
+
+        except ClientError:
+            return False
+
+    def object_exists(self, obj:S3Object) -> bool:
+        try:
+            _ = self._client.head_object(Bucket=obj.bucket, Key=obj.key)
+            return True
+
+        except ClientError:
+            return False
+
+    def make_bucket(self, bucket:str) -> None:
+        self._client.create_bucket(Bucket=bucket)
