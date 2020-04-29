@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/
 """
 
+import typing as T
 from math import ceil, log10
 
 
@@ -34,3 +35,7 @@ def human_size(value:float, base:int = 1024, threshold:float = 0.8) -> str:
         order += 1
 
     return f"{value:.{sigfigs}g} {quantifiers[order]}"
+
+
+def hex2bytes(hex_string:T.Optional[str]) -> T.Optional[bytes]:
+    return bytes.fromhex(hex_string or "") or None

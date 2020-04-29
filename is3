@@ -119,16 +119,31 @@ if __name__ == "__main__":
 
                     start_ts = datetime.utcnow()
 
-                    # TODO
-                    # Copy (inc metadata, if requested)
-                    # Verify (by size and checksum)
+                    checksum = utils.hex2bytes(data_object.checksum)
+                    metadata = None if args.ignore_avus else irods.metadata(data_object)
+
+                    with data_object.open("r+") as data_stream:
+                        try:
+                            s3client.transfer(data_stream, size=data_object.size,
+                                                           checksum=checksum,
+                                                           metadata=metadata)
+                        except s3.ClientError as exc:
+                            # Don't bail out if the transfer fails, just
+                            # continue with the next data object
+                            log.error(exc)
+                            continue
 
                     tx_time = datetime.utcnow() - start_ts
                     tx_rate = data_object.size / tx_time.total_seconds()
 
-                    log.info("Complete; "
-                             f"transferred {utils.human_size(data_object.size)}B "
-                             f"at {utils.human_size(tx_rate)}B/s")
+                    message = "Complete; " \
+                              f"transferred {utils.human_size(data_object.size)}B " \
+                              f"at {utils.human_size(tx_rate)}B/s"
+
+                    if checksum is not None:
+                        message = f"{message}, MD5 {data_object.checksum}"
+
+                    log.info(message)
 
 
         # NOTE The generator is evaluated lazily, so exceptions will
@@ -146,23 +161,3 @@ if __name__ == "__main__":
 
         except ObjectAlreadyExists as exc:
             _handle(exc)
-
-
-##    with iRODSSession(irods_env_file=irods_env, **_ssl) as session:
-##
-##        data_object = session.data_objects.get(irods_obj)
-##        irods_checksum = data_object.checksum
-##        irods_size = data_object.size
-##
-##        def _progress(so_far):
-##            # FIXME This does not work as documented
-##            # print(f"Copied {so_far} of {irods_size} bytes; {so_far/irods_size:.1%} complete")
-##            pass
-##
-##        with data_object.open("r+") as irods_stream:
-##            S3.upload_fileobj(irods_stream, s3_bucket, s3_obj, Callback=_progress)
-##
-##        s3_file = S3.head_object(Bucket=s3_bucket, Key=s3_obj)
-##        if s3_file["ContentLength"] != irods_size:
-##            print("Copy failed, sizes differ")
-##            sys.exit(1)
