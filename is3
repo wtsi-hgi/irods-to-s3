@@ -124,9 +124,9 @@ if __name__ == "__main__":
 
                     with data_object.open("r+") as data_stream:
                         try:
-                            s3client.transfer(data_stream, size=data_object.size,
-                                                           checksum=checksum,
-                                                           metadata=metadata)
+                            s3client.transfer(data_stream, s3_target, size=data_object.size,
+                                                                      checksum=checksum,
+                                                                      metadata=metadata)
                         except s3.ClientError as exc:
                             # Don't bail out if the transfer fails, just
                             # continue with the next data object
