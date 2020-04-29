@@ -28,6 +28,7 @@ from ipaddress import ip_address
 from pathlib import Path
 
 import boto3
+import botocore.client
 from botocore.exceptions import ClientError
 
 
@@ -47,10 +48,10 @@ def _is_ip(address:str) -> bool:
 
     try:
         _ = ip_address(to_test)
+        return True
+
     except ValueError:
         return False
-
-    return True
 
 
 class InvalidS3URL(Exception):
@@ -108,7 +109,7 @@ class S3Object:
 
 
 class S3Client:
-    _client:object  # FIXME botocore.client.S3 is not a thing??
+    _client:botocore.client.BaseClient
 
     def __init__(self, config:T.Optional[Path] = None) -> None:
         if config is None:
