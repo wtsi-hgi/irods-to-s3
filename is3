@@ -80,7 +80,7 @@ if __name__ == "__main__":
         path_to_irods = partial(irods.get_irods_object, isess)
 
         try:
-            data_objects = irods.expand(*map(path_to_irods, args.source), args.recursive)
+            data_objects = irods.expand(*map(path_to_irods, args.source), recursive=args.recursive)
         except irods.NotAbsolute as exc:
             _handle(exc)
         except irods.NoSuchObject as exc:

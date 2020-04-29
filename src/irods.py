@@ -97,7 +97,7 @@ def expand(*objs:_iRODSObject, recursive:bool = True) -> T.Iterator[iRODSDataObj
                 raise CannotDescend(f"iRODS object at {obj.path} is a collection")
 
             yield from obj.data_objects
-            yield from expand(*obj.subcollections)
+            yield from expand(*obj.subcollections, recursive=recursive)
 
         else:
             yield obj
