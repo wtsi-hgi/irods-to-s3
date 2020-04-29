@@ -112,9 +112,9 @@ def metadata(obj:iRODSDataObject, *, key_delimiter:str = "; ", unit_delimiter:st
     collapsed = defaultdict(list)
     for avu in avus:
         value = avu.value
-        if avu.unit:
-            value = f"{value}{unit_delimiter}{avu.unit}"
+        if avu.units is not None:
+            value = f"{value}{unit_delimiter}{avu.units}"
 
-        collapsed[avu.key].append(value)
+        collapsed[avu.name].append(value)
 
     return {key: key_delimiter.join(value) for key, value in collapsed.items()}
