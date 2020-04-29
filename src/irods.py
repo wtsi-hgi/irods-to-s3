@@ -74,7 +74,7 @@ def get_irods_object(session:iRODSSession, path:Path) -> _iRODSObject:
     if session.collections.exists(path):
         return session.collections.get(path)
 
-    if sessions.data_objects.exists(path):
+    if session.data_objects.exists(path):
         return session.data_objects.get(path)
 
     raise NoSuchObject(f"iRODS object {path} doesn't exist")
