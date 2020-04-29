@@ -71,11 +71,13 @@ def get_irods_object(session:iRODSSession, path:Path) -> _iRODSObject:
     if not path.is_absolute():
         raise NotAbsolute(f"iRODS path {path} must be absolute")
 
-    if session.collections.exists(path):
-        return session.collections.get(path)
+    path_s = str(path)
 
-    if session.data_objects.exists(path):
-        return session.data_objects.get(path)
+    if session.collections.exists(path_s):
+        return session.collections.get(path_s)
+
+    if session.data_objects.exists(path_s):
+        return session.data_objects.get(path_s)
 
     raise NoSuchObject(f"iRODS object {path} doesn't exist")
 
