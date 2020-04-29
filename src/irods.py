@@ -20,6 +20,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 import os
 import ssl
 import typing as T
+from collections import defaultdict
 from pathlib import Path
 
 from irods.data_object import iRODSDataObject
@@ -98,3 +99,20 @@ def expand(*objs:_iRODSObject, recursive:bool = True) -> T.Iterator[iRODSDataObj
 
         else:
             yield obj
+
+
+def metadata(obj:iRODSDataObject, *, key_delimiter:str = "; ", unit_delimiter:str = " ") -> T.Optional[T.Dict[str, str]]:
+    avus = obj.metadata.items()
+
+    if len(avus) == 0:
+        return None
+
+    collapsed = defaultdict(list)
+    for avu in avus:
+        value = avu.value
+        if avu.unit:
+            value = f"{value}{unit_delimiter}{avu.unit}"
+
+        collapsed[avu.key].append(value)
+
+    return {key: key_delimiter.join(value) for key, value in collapsed.items()}
