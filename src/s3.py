@@ -19,6 +19,7 @@ with this program. If not, see https://www.gnu.org/licenses/
 
 from __future__ import annotations
 
+import base64
 import os
 import re
 import typing as T
@@ -168,3 +169,18 @@ class S3Client:
 
     def delete_object(self, obj:S3Object) -> None:
         self._client.delete_object(Bucket=obj.bucket, Key=obj.key)
+
+    def transfer(self, source:T.Union[bytes, T.BinaryIO], target:S3Object, *, size:int, checksum:T.Optional[bytes] = None, metadata:T.Optional[T.Dict[str, str]] = None) -> None:
+        options:T.Dict = {
+            "Body":          source,
+            "Bucket":        target.bucket,
+            "Key":           target.key,
+            "ContentLength": size}
+
+        if checksum is not None:
+            options["ContentMD5"] = base64.b64encode(checksum).decode()
+
+        if metadata is not None:
+            options["Metadata"] = metadata
+
+        self._client.put_object(**options)
