@@ -60,7 +60,7 @@ class Logger:
     _level:Level
 
     def __init__(self, level:Level, formatter:logging.Formatter = _formatter) -> None:
-        self._logger = logging.getLogger()
+        self._logger = logging.getLogger("is3")
 
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
